@@ -8,17 +8,13 @@ from tqdm import tqdm
 
 from src.model.unet import UNet
 from src.utils.compute_prediction import compute_prediction
-from src.utils.showcase_downloads import run_showcase_downloads
-
-
+from skimage.morphology import remove_small_objects, label
+from skimage.measure import regionprops_table
 
 def main(params):
 
     params.results_folder = os.path.join("./results_showcase", params.exp_tag)
     os.makedirs(params.results_folder, exist_ok=True)
-
-    # download showcase image and models
-    run_showcase_downloads()
 
     # Load data
     image = sitk.ReadImage(params.input_img_path)
@@ -29,6 +25,7 @@ def main(params):
     image_tensor = torch.tensor(image_array).float()
     image_tensor = image_tensor.unsqueeze(axis=0).unsqueeze(axis=0)
     image_tensor = image_tensor.to(device=params.device)
+    params.input_size = image_array.shape
 
     # Create empty volume to sum predictions
     pred_sum = np.zeros((params.input_size))
@@ -46,6 +43,18 @@ def main(params):
     # Majority vote
     prediction = np.where(pred_sum >= 2, 1, 0).astype(np.int16)
 
+    # Post processing to remove small non connected objects
+    prediction = prediction.astype(bool)
+    label_img, nums = label(prediction, return_num=True, connectivity=2)
+    props = regionprops_table(label_img, properties=("label","area"))
+    min_areas = props['area'][props['area'] < int((params.input_size[2] / 15)**3)]
+    if len(min_areas) > 0:
+        min_comp_size = max(min_areas) + 1
+        print(f"smallest element to keep : {min_comp_size}")
+        merge_array_ = remove_small_objects(prediction, min_comp_size, in_place=True)
+    else:
+        pass
+
     # Saving of the prediction
     prediction_image = sitk.GetImageFromArray(prediction.astype(np.int16))
     prediction_image.SetDirection(direction)
@@ -59,14 +68,13 @@ if __name__ == '__main__':
     # Define parameters
     params = Munch()
     params.device = "cpu"
-    params.input_img_path = "./data/image_sample/50.0.mhd"
-    params.input_size = [256, 256, 256]
+    params.input_img_path = "./data/input_data/exhale_mediastinal.mhd"
     params.n_channels = 1
     params.n_classes = 2
     params.pre_trained_weights_path = {
-        "axial": "./data/model_weights/fold1_ep20_bs32_lr1e-3_axial.pt",
-        "coronal" : "./data/model_weights/fold1_ep20_bs32_lr1e-3_coronal.pt",
-        "sagittal" : "./data/model_weights/fold1_ep20_bs32_lr1e-3_sagittal.pt",
+        "axial": "./data/model_weights/train_multi_PK352_CHU320_axial_fold0.pt",
+        "coronal" : "./data/model_weights/train_multi_PK352_CHU320_coronal_fold0.pt",
+        "sagittal" : "./data/model_weights/train_multi_PK352_CHU320_sagittal_fold0.pt",
     }
 
     # Extract the experiment tag and create the associated folder

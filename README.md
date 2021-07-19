@@ -1,19 +1,5 @@
 # deep_learning_lungs_segmentation
 
-![image from web](https://www.creatis.insa-lyon.fr/nextcloud/index.php/s/boGJjsP5tnFSWw2/preview)
-
-This repository is used to demonstrate the method published in : http://link-to-paper.com  
-Authors : Ludmilla Penarrubia, Nicolas Pinon, Emmanuel Roux, Eduardo Enrique Davila Serrano, Jean-Christophe Richard, Maciej Orkisz and David Sarrut.
-
-
-## This repository has several usages :
-
- 1- Use our trained model on the data we provide, as a proof of concept.  
-
- 2- Test our trained model on your data, to get the motion mask segmentations on your data.  
-
- 3- Train our model on your data and test it on your data  
-
 ## Pre-requisites and installations
 
 * Make sure you have python3 installed  
@@ -39,31 +25,22 @@ Authors : Ludmilla Penarrubia, Nicolas Pinon, Emmanuel Roux, Eduardo Enrique Dav
 
     `pip3 install gatetools`  
 
+## Use *our* trained model on *your* data
 
+Preprocessing step : Your data spacing should be 1mm isotropic  
+You can use gatetools to do so, with the command :  
 
-## Case 1 : Use *our* trained model on *our* showcase data
+`gatetools/bin/gt_affine_transform -i your_data.mhd -o preprocessed_data.mhd --newspacing "1.0" --force_resample --adaptive -p "-1000.0"`
+
+Then to predict lungs mask with the model :
 
    Run :`python3 trained_model_on_showcase_data.py`  
    Motion mask as .mhd and .raw files will be located in : `results_showcase/`  
-
-## Case 2 : Use *our* trained model on *your* data (work in progress)
-
-   Put all your .nii or .mgh or ... in the directory `data/`  
-   (optional) Run : `gatetools/bin/gt_affine_transform -i input_data.mhd -o output_data.mhd --newspacing "2.0" --force_resample --adaptative -p "-1000.0"`  
-   Run : `python3 infer_motion_masks.py`  
-
-   Motion mask as .nii files and figures will be located in : `results/`  
-   We suggest skipping the preprocessing step only if your data is sampled as isotropic 2mm^3  
-
-## (Advanced) Case 3 : Train and test our model on *your* data
-
-For this use-case, we recommend pluggin in your code the model located in model.py, we do not provide the data management part of the code, as it is really specific to each user.  
+  
 
 
 ## Acknowledments
 
 Thanks to the authors of this repository : https://github.com/milesial/Pytorch-UNet for providing an efficient implementation of U-net.  
-
-This work was performed within the framework of the LABEX PRIMES (ANR-11-LABX-0063) of Université de Lyon, within the program "Investissements d'Avenir"(ANR-11-IDEX-0007) operated by the French National Research Agency (ANR).  
 
 Thanks to Olivier Bernard for getting us started with the project by providing examples of his codes.
