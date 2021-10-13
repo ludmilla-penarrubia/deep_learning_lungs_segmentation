@@ -27,10 +27,14 @@
 
 ## Use *our* trained model on *your* data
 
-Preprocessing step : Your data spacing should be 1mm isotropic  
+Preprocessing step : Your data spacing should be **1mm** isotropic  
 You can use gatetools to do so, with the command :  
 
 `gatetools/bin/gt_affine_transform -i your_data.mhd -o preprocessed_data.mhd --newspacing "1.0" --force_resample --adaptive -p "-1000.0"`
+
+You should change the path to your image at l.71 of the file _trained_model_on_showcase_data.py_ (params.input_img_path)
+
+If your networks are located elsewhere than at _./data/model_weights/_, please put the right paths at lines 75, 76 and 77
 
 Then to predict lungs mask with the model :
 
