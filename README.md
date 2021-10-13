@@ -38,7 +38,7 @@ If your networks are located elsewhere than at _./data/model_weights/_, please p
 
 Then to predict lungs mask with the model :
 
-   Run :`python3 trained_model_on_showcase_data.py`  
+   Run :`python3 trained_model_on_your_data.py`  
    Motion mask as .mhd and .raw files will be located in : `results_showcase/`  
   
 
