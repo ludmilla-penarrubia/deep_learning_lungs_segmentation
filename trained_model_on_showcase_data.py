@@ -28,7 +28,7 @@ def main(params):
     params.input_size = image_array.shape
 
     # Create empty volume to sum predictions
-    pred_sum = np.zeros((params.input_size))
+    pred_sum = torch.zeros((params.input_size)).to(params.device)
 
     # Load UNet models and predict volumes in each direction
     for slicing in tqdm(params.pre_trained_weights_path.keys(), total=3, desc="Direction prediction"):
@@ -41,10 +41,10 @@ def main(params):
         pred_sum += pred_array
 
     # Majority vote
-    prediction = np.where(pred_sum >= 2, 1, 0).astype(np.int16)
+    prediction = torch.where(pred_sum >= 2, 1, 0)
 
     # Post processing to remove small non connected objects
-    prediction = prediction.astype(bool)
+    prediction = prediction.detach().cpu().numpy().astype(bool)
     label_img, nums = label(prediction, return_num=True, connectivity=2)
     props = regionprops_table(label_img, properties=("label","area"))
     min_areas = props['area'][props['area'] < int((params.input_size[2] / 15)**3)]
@@ -56,7 +56,7 @@ def main(params):
         pass
 
     # Saving of the prediction
-    prediction_image = sitk.GetImageFromArray(prediction.astype(np.int16))
+    prediction_image = sitk.GetImageFromArray(prediction.astype(np.int8))
     prediction_image.SetDirection(direction)
     prediction_image.SetOrigin(origin)
     prediction_image.SetSpacing(spacing)
@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     # Define parameters
     params = Munch()
-    params.device = "cpu"
+    params.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
     params.input_img_path = "./data/input_data/exhale_mediastinal.mhd"
     params.n_channels = 1
     params.n_classes = 2
