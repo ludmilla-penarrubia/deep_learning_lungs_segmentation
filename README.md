@@ -6,15 +6,15 @@
 
 * Clone this repository on your machine and go in it:  
 
-    `cd deep_learning_motion_mask_segmentation/`  
+    `cd deep_learning_lungs_segmentation/`  
 
 * Create a virtual environments  
 
-    `python3 -m venv motion_mask_seg`  
+    `python3 -m venv env_seg`  
 
 * Activate the virtual environment  
 
-    `source motion_mask_seg/bin/activate`  
+    `source env_seg/bin/activate`  
 
 * Update pip3 repository and install dependencies listed in the requirements.txt  
 

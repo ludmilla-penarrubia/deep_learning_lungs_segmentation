@@ -1,6 +1,9 @@
 import torch
+import matplotlib.pyplot as plt
+import SimpleITK as sitk
+import numpy as np
 
-def compute_prediction(model, slicing, image_tensor):
+def compute_prediction(model, slicing, image_tensor,params):
     axis_slicing = {"axial":0, "coronal":1, "sagittal":2}
     nb_slices = image_tensor.size()[axis_slicing[slicing]+2]
     device = next(model.parameters()).device
