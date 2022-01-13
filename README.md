@@ -1,5 +1,7 @@
 # deep_learning_lungs_segmentation
 
+![example](example.jpg)
+
 ## Pre-requisites and installations
 
 * Make sure you have python3 installed  
