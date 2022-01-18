@@ -1,5 +1,8 @@
 import json
 import os
+import argparse
+from numpy.core.defchararray import upper
+from scipy.ndimage import interpolation
 import torch
 import SimpleITK as sitk
 import numpy as np
@@ -15,26 +18,58 @@ from skimage.measure import regionprops_table
 
 def main(params):
 
-    params.results_folder = os.path.join("./results_showcase", params.exp_tag)
+    params.results_folder = os.path.join("./results_showcase")
     os.makedirs(params.results_folder, exist_ok=True)
 
     # Load data
     image = sitk.ReadImage(params.input_img_path)
-    direction = image.GetDirection()
-    origin = image.GetOrigin()
-    spacing = image.GetSpacing()
-    image_array = sitk.GetArrayFromImage(image)
-    # image_array_ = np.where(image_array < -1024, -1024, image_array)
-    # image_array_ = image_array_.astype(np.int16)
+    print(f"spacing initial : {image.GetSpacing()} and shape {image.GetSize()}")
+    # Image pre processing
+    original_size = image.GetSize()
+    original_direction = image.GetDirection()
+    original_origin = image.GetOrigin()
+    original_spacing = image.GetSpacing()
+    new_spacing = [1.0,1.0,1.0]
+    to_resample_size=[int(original_size[0] * original_spacing[0]), int(original_size[1] * original_spacing[1]),
+                        int(original_size[2] * original_spacing[2])]
+
+    # Gaussian filter applied to smooth the image
+    gaussian_filter = sitk.SmoothingRecursiveGaussianImageFilter()
+    gaussian_filter.SetSigma(1.0)
+    smooth_image = gaussian_filter.Execute(image)
+    # Resampling to change the spacing of the image to isotropic 1mm
+    resample = sitk.Resample(image1=smooth_image, size=to_resample_size,
+                            transform=sitk.Transform(),
+                            interpolator=sitk.sitkBSplineTransform,
+                            outputOrigin=image.GetOrigin(),
+                            outputSpacing=new_spacing,
+                            outputDirection=image.GetDirection(),
+                            defaultPixelValue=0,
+                            outputPixelType=image.GetPixelID())
+    resample_size = resample.GetSize()
+    # Padding of the image to fit in the closest bigger image divisible by 32
+    upper_bound = [(resample_size[0]//32 +1)*32- resample_size[0], (resample_size[1]//32 +1)*32 - resample_size[1],
+                (resample_size[2]//32 +1)*32 - resample_size[2]]
+    resize = sitk.ConstantPadImageFilter()
+    resize.SetConstant(-1000)
+    resize.SetPadLowerBound([0,0,0])
+    resize.SetPadUpperBound(upper_bound)
+    resized_image = resize.Execute(resample)
+    resized_direction = resized_image.GetDirection()
+    resized_origin = resized_image.GetOrigin()
+    resized_spacing = resized_image.GetSpacing()
+
+    # Image to tensor
+    image_array = sitk.GetArrayFromImage(resized_image)
     image_tensor = torch.tensor(image_array).float()
     image_tensor = image_tensor.unsqueeze(axis=0).unsqueeze(axis=0)
     image_tensor = image_tensor.to(device=params.device)
     params.input_size = image_array.shape
 
-    # Create empty volume to sum predictions
-    pred_sum = torch.zeros((params.input_size)).to(params.device)
-
     if params.method != "3D":
+        # Create empty volume to sum predictions
+        pred_sum = torch.zeros((params.input_size)).to(params.device)
+
         # Load UNet models and predict volumes in each direction
         for slicing in tqdm(params.pre_trained_weights_path.keys(), total=3, desc="Direction prediction"):
             model = UNet(params.n_channels, params.n_classes)
@@ -42,7 +77,7 @@ def main(params):
             model.load_state_dict(checkpoint["model_state_dict"])
             model.to(params.device)
             model.eval()
-            pred_array = compute_prediction(model, slicing, image_tensor,[direction,origin,spacing])
+            pred_array = compute_prediction(model, slicing, image_tensor,[resized_direction, resized_origin,resized_spacing])
             pred_sum += pred_array
 
         # Majority vote
@@ -75,32 +110,40 @@ def main(params):
     else:
         pass
 
-    # Saving of the prediction
-    prediction_image = sitk.GetImageFromArray(prediction.astype(np.int8))
-    prediction_image.SetDirection(direction)
-    prediction_image.SetOrigin(origin)
-    prediction_image.SetSpacing(spacing)
-    sitk.WriteImage(prediction_image, os.path.join(params.results_folder, "pred_demo.nii.gz"))
+    # Processing the prediction to convert it to original image size
+    prediction = sitk.GetImageFromArray(prediction.astype(np.int8))
+    prediction_ = prediction[:resample_size[0], :resample_size[1], :resample_size[2]]
+    
+    prediction_image = sitk.Resample(image1=prediction_, size=original_size,
+                            transform=sitk.Transform(),
+                            interpolator=sitk.sitkNearestNeighbor,
+                            outputOrigin=original_origin,
+                            outputSpacing=original_spacing,
+                            outputDirection=original_direction,
+                            defaultPixelValue=0,
+                            outputPixelType=image.GetPixelID())
+    
+    sitk.WriteImage(prediction_image, os.path.join("./results_showcase", params.output_img_path))
 
 
 if __name__ == '__main__':
 
     # Define parameters
+    parser = argparse.ArgumentParser(description="Deep Learning based Lung Segmentation algorithm")
+    parser.add_argument('-i', "--input", required=True, type=str, help="Path to input image")
+    parser.add_argument('-o', "--output", required=True, type=str, help="Path to output image")
+    parser.add_argument('-w',"--weights", required=True, type=str, help="Path to model weights")
+    parser.add_argument('-d', "--device", required=False, default='cpu', type=str, help="device on which to run the code, by default cpu but can be torch.cuda('cuda:0')")
+    parser.add_argument('-m', "--method", required=False, default='3D', type=str, help="Method to pick between '3D' and 'multi-2D', (default 3D)")
+    args = parser.parse_args()
+
     params = Munch()
-    params.device = "cpu"#torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
-    #params.input_img_path = "./data/input_data/Expi-B.mhd"
-    params.input_img_path = "./data/input_data/Expi-B.mhd"
     params.n_channels = 1
     params.n_classes = 2
-    params.method = "3D"
-    params.pre_trained_weights_path = {
-        "axial": "./data/model_weights/train_multi_PK352_CHU320_axial_fold0.pt",
-        "coronal" : "./data/model_weights/train_multi_PK352_CHU320_coronal_fold0.pt",
-        "sagittal" : "./data/model_weights/train_multi_PK352_CHU320_sagittal_fold0.pt",
-    }
-    params.pre_trained_weights_path_3D = "./data/model_weights/train_3D_fold0_bs2.pt"
-
-    # Extract the experiment tag and create the associated folder
-    params.exp_tag = "trained_model_on_your_data"
+    params.device = args.device 
+    params.input_img_path = args.input
+    params.output_img_path = args.output
+    params.method = args.method
+    params.pre_trained_weights_path_3D = args.weights
 
     main(params)
