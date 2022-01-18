@@ -22,30 +22,15 @@
 
     `pip3 install --upgrade pip`  
     `python3 -m pip install -r requirements.txt`  
-
-* Install Gatetools for preprocessing (optional)
-
-    `pip3 install gatetools`  
+ 
 
 ## Use *our* trained model on *your* data
 
-Preprocessing step : Your data spacing should be **1mm** isotropic  
-You can use gatetools to do so, with the command :  
+To predict lungs mask (on your image input_data.mhd) with the model (located at checkpoint_best.pt), in the working directory, run the following command:
 
-    Run : gatetools/bin/gt_affine_transform -i your_data.mhd -o preprocessed_data.mhd --newspacing "1.0" --force_resample --adaptive -p "-1000.0"
-
-Then you need to make sure your data has the right size, meaning every dimension (x,y,z) should be divisible by 32. 
-
-    Run : ./gt_image_resize -i preprocessed_data.mhd -o preprocesses_data_2.mhd --newsize  x,y,z -p "-1000.0" --interpolation_mode BSpline
-
-You should change the path to your image at l.71 of the file _trained_model_on_your_data.py_ (params.input_img_path)
-
-If your networks are located elsewhere than at _./data/model_weights/_, please put the right paths at lines 75, 76 and 77
-
-Then to predict lungs mask with the model :
-
-    Run : python3 trained_model_on_your_data.py
-   Motion mask as .mhd and .raw files will be located in : `results_showcase/`  
+    python3 trained_model_on_your_data.py -i input_data.mhd -o output_data.mhd -w checkpoint_best.pt
+All paths are realtive to the working directory.
+Predicted lungs mask as .mhd and .raw files will be located in : `results_showcase/`  
   
 
 
