@@ -112,14 +112,17 @@ def main(params):
     # Post processing to remove small non connected objects
     prediction = prediction.detach().cpu().numpy().astype(bool)
     label_img, nums = label(prediction, return_num=True, connectivity=2)
-    props = regionprops_table(label_img, properties=("label","area"))
-    min_areas = props['area'][props['area'] < int((params.input_size[2] / 15)**3)]
-    if len(min_areas) > 0:
-        min_comp_size = max(min_areas) + 1
-        print(f"Elements kept after post-processing : {props['area'][props['area'] > min_comp_size]} in voxels")
-        merge_array_ = remove_small_objects(prediction, min_comp_size, in_place=True)
-    else:
-        pass
+    try:
+        props = regionprops_table(label_img, properties=("label","area"))
+        min_areas = props['area'][props['area'] < int((params.input_size[2] / 15)**3)]
+        if len(min_areas) > 0:
+            min_comp_size = max(min_areas) + 1
+            print(f"Elements kept after post-processing : {props['area'][props['area'] > min_comp_size]} in voxels")
+            merge_array_ = remove_small_objects(prediction, min_comp_size, in_place=True)
+        else:
+            pass
+    except:
+        print(f"An error occured, the prediction may be empty")
 
     # Processing the prediction to convert it to original image size
     prediction = sitk.GetImageFromArray(prediction.astype(np.int8))
@@ -160,4 +163,5 @@ if __name__ == '__main__':
     params.method = args.method
     params.pre_trained_weights_path_3D = args.weights
 
-    main(params)
+    with torch.no_grad():
+        main(params)
