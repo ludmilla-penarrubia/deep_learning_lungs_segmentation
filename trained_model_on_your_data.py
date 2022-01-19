@@ -1,8 +1,6 @@
 import json
 import os
 import argparse
-from numpy.core.defchararray import upper
-from scipy.ndimage import interpolation
 import torch
 import SimpleITK as sitk
 import numpy as np
@@ -30,15 +28,15 @@ def main(params):
     original_origin = image.GetOrigin()
     original_spacing = image.GetSpacing()
     new_spacing = [1.0,1.0,1.0]
-    to_resample_size=[int(original_size[0] * original_spacing[0]), int(original_size[1] * original_spacing[1]),
-                        int(original_size[2] * original_spacing[2])]
-
+    to_resample_size=[int(original_size[0] * original_spacing[0] / new_spacing[0]), int(original_size[1] * original_spacing[1] / new_spacing[1]),
+                        int(original_size[2] * original_spacing[2] / new_spacing[2])]
+    
     # Gaussian filter applied to smooth the image
     gaussian_filter = sitk.SmoothingRecursiveGaussianImageFilter()
     gaussian_filter.SetSigma(1.0)
     smooth_image = gaussian_filter.Execute(image)
     # Resampling to change the spacing of the image to isotropic 1mm
-    resample = sitk.Resample(image1=smooth_image, size=to_resample_size,
+    resample_image = sitk.Resample(image1=smooth_image, size=to_resample_size,
                             transform=sitk.Transform(),
                             interpolator=sitk.sitkBSplineTransform,
                             outputOrigin=image.GetOrigin(),
@@ -46,21 +44,34 @@ def main(params):
                             outputDirection=image.GetDirection(),
                             defaultPixelValue=0,
                             outputPixelType=image.GetPixelID())
-    resample_size = resample.GetSize()
+    resample_size = resample_image.GetSize()
+    print(f"shape of resampled image: {resample_size}")
     # Padding of the image to fit in the closest bigger image divisible by 32
-    upper_bound = [(resample_size[0]//32 +1)*32- resample_size[0], (resample_size[1]//32 +1)*32 - resample_size[1],
-                (resample_size[2]//32 +1)*32 - resample_size[2]]
-    resize = sitk.ConstantPadImageFilter()
-    resize.SetConstant(-1000)
-    resize.SetPadLowerBound([0,0,0])
-    resize.SetPadUpperBound(upper_bound)
-    resized_image = resize.Execute(resample)
+    padding = []
+    for i in range(3):
+        if resample_size[i] // 32 == resample_size[i]/32:
+            padding.append(0)
+        else:
+            padding.append(1)
+    upper_bound = [(resample_size[0]//32 + padding[0])*32- resample_size[0], (resample_size[1]//32 + padding[1])*32 - resample_size[1],
+                (resample_size[2]//32 + padding[2])*32 - resample_size[2]]
+    if sum(padding) == 0:
+        resized_image = resample_image
+    else:
+        resize = sitk.ConstantPadImageFilter()
+        resize.SetConstant(-1000)
+        resize.SetPadLowerBound([0,0,0])
+        resize.SetPadUpperBound(upper_bound)
+        resized_image = resize.Execute(resample_image)
+
     resized_direction = resized_image.GetDirection()
     resized_origin = resized_image.GetOrigin()
     resized_spacing = resized_image.GetSpacing()
+    print(f"shape of resized image: {resized_image.GetSize()}")
 
     # Image to tensor
     image_array = sitk.GetArrayFromImage(resized_image)
+
     image_tensor = torch.tensor(image_array).float()
     image_tensor = image_tensor.unsqueeze(axis=0).unsqueeze(axis=0)
     image_tensor = image_tensor.to(device=params.device)
@@ -112,6 +123,9 @@ def main(params):
 
     # Processing the prediction to convert it to original image size
     prediction = sitk.GetImageFromArray(prediction.astype(np.int8))
+    prediction.SetSpacing(resized_spacing)
+    prediction.SetDirection(resized_direction)
+    prediction.SetOrigin(resized_origin)
     prediction_ = prediction[:resample_size[0], :resample_size[1], :resample_size[2]]
     
     prediction_image = sitk.Resample(image1=prediction_, size=original_size,
@@ -122,7 +136,7 @@ def main(params):
                             outputDirection=original_direction,
                             defaultPixelValue=0,
                             outputPixelType=image.GetPixelID())
-    
+
     sitk.WriteImage(prediction_image, os.path.join("./results_showcase", params.output_img_path))
 
 
@@ -140,7 +154,7 @@ if __name__ == '__main__':
     params = Munch()
     params.n_channels = 1
     params.n_classes = 2
-    params.device = args.device 
+    params.device = 'cpu'#torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')#args.device 
     params.input_img_path = args.input
     params.output_img_path = args.output
     params.method = args.method
