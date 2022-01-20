@@ -7,6 +7,7 @@ import numpy as np
 from munch import Munch
 from tqdm import tqdm
 
+import matplotlib.pyplot as plt
 from src.model.unet import UNet
 from src.model.unet3d import UNet3D
 from src.utils.compute_prediction import compute_prediction
@@ -124,13 +125,16 @@ def main(params):
     except:
         print(f"An error occured, the prediction may be empty")
 
+    plt.imshow(prediction[150,:,:])
+    plt.show()
     # Processing the prediction to convert it to original image size
     prediction = sitk.GetImageFromArray(prediction.astype(np.int8))
     prediction.SetSpacing(resized_spacing)
     prediction.SetDirection(resized_direction)
     prediction.SetOrigin(resized_origin)
     prediction_ = prediction[:resample_size[0], :resample_size[1], :resample_size[2]]
-    
+    plt.imshow(sitk.GetArrayFromImage(prediction_)[150,:,:])
+    plt.show()
     prediction_image = sitk.Resample(image1=prediction_, size=original_size,
                             transform=sitk.Transform(),
                             interpolator=sitk.sitkNearestNeighbor,
@@ -139,8 +143,9 @@ def main(params):
                             outputDirection=original_direction,
                             defaultPixelValue=0,
                             outputPixelType=image.GetPixelID())
-
-    sitk.WriteImage(prediction_image, os.path.join("./results_showcase", params.output_img_path))
+    plt.imshow(sitk.GetArrayFromImage(prediction_image)[250,:,:])
+    plt.show()
+    sitk.WriteImage(prediction_image, os.path.join("./results_showcase", params.output_img_path), useCompression=True)
 
 
 if __name__ == '__main__':
@@ -150,18 +155,26 @@ if __name__ == '__main__':
     parser.add_argument('-i', "--input", required=True, type=str, help="Path to input image")
     parser.add_argument('-o', "--output", required=True, type=str, help="Path to output image")
     parser.add_argument('-w',"--weights", required=True, type=str, help="Path to model weights")
-    parser.add_argument('-d', "--device", required=False, default='cpu', type=str, help="device on which to run the code, by default cpu but can be torch.cuda('cuda:0')")
+    parser.add_argument('-d', "--device", required=False, default='cpu', type=str, help="device on which to run the code, by default cpu but can be gpu")
     parser.add_argument('-m', "--method", required=False, default='3D', type=str, help="Method to pick between '3D' and 'multi-2D', (default 3D)")
     args = parser.parse_args()
 
     params = Munch()
     params.n_channels = 1
     params.n_classes = 2
-    params.device = 'cpu'#torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')#args.device 
+    if args.device == "gpu":
+        params.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    else:
+        params.device = 'cpu'
     params.input_img_path = args.input
     params.output_img_path = args.output
     params.method = args.method
     params.pre_trained_weights_path_3D = args.weights
+    params.pre_trained_weights_path = {
+        'axial':'./data/checkpoint_best_axial.pt',
+        'coronal': './data/checkpoint_best_coronal.pt',
+        'sagittal':'./data/checkpoint_best_sagittal.pt'
+    }
 
     with torch.no_grad():
         main(params)
