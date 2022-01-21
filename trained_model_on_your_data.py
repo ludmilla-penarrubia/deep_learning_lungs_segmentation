@@ -125,16 +125,13 @@ def main(params):
     except:
         print(f"An error occured, the prediction may be empty")
 
-    plt.imshow(prediction[150,:,:])
-    plt.show()
     # Processing the prediction to convert it to original image size
     prediction = sitk.GetImageFromArray(prediction.astype(np.int8))
     prediction.SetSpacing(resized_spacing)
     prediction.SetDirection(resized_direction)
     prediction.SetOrigin(resized_origin)
     prediction_ = prediction[:resample_size[0], :resample_size[1], :resample_size[2]]
-    plt.imshow(sitk.GetArrayFromImage(prediction_)[150,:,:])
-    plt.show()
+
     prediction_image = sitk.Resample(image1=prediction_, size=original_size,
                             transform=sitk.Transform(),
                             interpolator=sitk.sitkNearestNeighbor,
@@ -143,8 +140,7 @@ def main(params):
                             outputDirection=original_direction,
                             defaultPixelValue=0,
                             outputPixelType=image.GetPixelID())
-    plt.imshow(sitk.GetArrayFromImage(prediction_image)[250,:,:])
-    plt.show()
+
     sitk.WriteImage(prediction_image, os.path.join("./results_showcase", params.output_img_path), useCompression=True)
 
 
@@ -170,11 +166,6 @@ if __name__ == '__main__':
     params.output_img_path = args.output
     params.method = args.method
     params.pre_trained_weights_path_3D = args.weights
-    params.pre_trained_weights_path = {
-        'axial':'./data/checkpoint_best_axial.pt',
-        'coronal': './data/checkpoint_best_coronal.pt',
-        'sagittal':'./data/checkpoint_best_sagittal.pt'
-    }
 
     with torch.no_grad():
         main(params)
