@@ -1,0 +1,16 @@
+[project]
+name = "deep-learning-lungs-segmentation"
+version = "0.1.0"
+description = "Code to run segmentation inference with a 3D UNet and pre and postprocessing"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "memory-profiler>=0.61.0",
+    "munch>=4.0.0",
+    "numpy>=2.4.3",
+    "scikit-image>=0.26.0",
+    "scipy>=1.17.1",
+    "simpleitk>=2.5.3",
+    "torch>=2.11.0",
+    "tqdm>=4.67.3",
+]

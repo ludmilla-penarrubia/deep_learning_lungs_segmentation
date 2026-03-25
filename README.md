@@ -10,18 +10,13 @@
 
     `cd deep_learning_lungs_segmentation/`  
 
-* Create a virtual environments  
+* Create a virtual environment by running the following command 
 
-    `python3 -m venv env_seg`  
+    `make venv`  
 
 * Activate the virtual environment  
 
-    `source env_seg/bin/activate`  
-
-* Update pip3 repository and install dependencies listed in the requirements.txt  
-
-    `pip3 install --upgrade pip`  
-    `python3 -m pip install -r requirements.txt`  
+    `source .venv/bin/activate`  
  
 
 ## Use *our* trained model on *your* data
